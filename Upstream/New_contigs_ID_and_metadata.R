@@ -33,25 +33,32 @@ table_of_origin <- dcast(virus_discovery, V1~V2)
 table_of_origin[-1] <- as.integer(table_of_origin[-1] != 0)
 table_of_origin[is.na(table_of_origin)] <- 0
 colnames(table_of_origin)[grep('V1', colnames(table_of_origin))] <- "Original_CID"
+
+if (ncol(table_of_origin) < 4) {
+
+  missing <- c("DeepVirFinder", "geNomad", "VIBRANT", "VirSorter2")[ ! c("DeepVirFinder", "geNomad", "VIBRANT", "VirSorter2") %in% colnames(table_of_origin)]
+
+  table_of_origin[, missing] <- NA
+}
 ##############################
 # ANALYSIS
 ##############################
 
 ##### new contigs IDs: 
 
-# Old name: CHV002101E03_NODE_183_length_31652_cov_6.159651_extended_partial|provirus_122336_143812
+# Old name: VCD_1003_200_NODE_105_length_43241_cov_28.816927_extended_circular|provirus_1_35799_1_7564-9851_35799
 
 # Changes:
-# 1) add source cohort (NEXT)
-# 2) keep only VXXX from the SAMPLE_ID	(V0021)
-# 3) shorten NODE_ to N and merge the node & its number (N183)
-# 4) shorten length_ to L and merge it with the final length of the fragment after extension & pruning (L30294)
+# 1) add source cohort (SIV)
+# 2) keep the SAMPLE_ID	(VCD_1003_200)
+# 3) shorten NODE_ to N and merge the node & its number (N105)
+# 4) shorten length_ to L and merge it with the final length of the fragment after extension & pruning (L7564)
 # 5) shorten cov_x.xxxx to K and merge with its number rounded to 1 digit after .
 # 6) COBRA status: extended or untouched? (E1)
 # 7) pruning status: pruned or not pruned? (P1); two sources: geNomad and CheckV
 # 8) fragment_number: F0 if unpruned, FX if pruned, where X - number of the fragment (F1);
 # the number of leading zeroes is empirically deduced from previous runs
-# New name: NEXT_V0021_N183_L21477_K6.2_E1_P1_F1
+# New name: SIV_VCD_1003_200_N105_L7564_K28.8_E1_P1_F1
 
 ##### Contigs (postdiscovery) metadata: 
 
@@ -60,10 +67,10 @@ VLP_contigs_PD_metadata <- quality_summary
 
 # this line prunes the post COBRA & geNomad & CheckV IDs (so all potential _extended and prophage coordinates characters are trimmed away)
 # it is very dependant on the number of underscores in the contig id, so if the sample name contains underscores, change the number from 6 to smth else
-VLP_contigs_PD_metadata$Original_CID <- sub("(([^_]*_){6}[^_]*).*", "\\1", sub("\\|.*", "", VLP_contigs_PD_metadata$contig_id))
+VLP_contigs_PD_metadata$Original_CID <- sub("(([^_]*_){8}[^_]*).*", "\\1", sub("\\|.*", "", VLP_contigs_PD_metadata$contig_id))
 
 # here, the original contig length is extracted from its id, so it is also dependant on "_" in contig & sample id
-VLP_contigs_PD_metadata$Original_length <- as.numeric(sapply(str_split(VLP_contigs_PD_metadata$Original_CID, "_"), `[[`, 5))
+VLP_contigs_PD_metadata$Original_length <- as.numeric(sapply(str_split(VLP_contigs_PD_metadata$Original_CID, "_"), `[[`, 7))
 
 # trim away CheckV prophage pruning coordinates to extract post-geNomad contig ids
 VLP_contigs_PD_metadata$POST_GND_CID <- sub("_[1-9]_[0-9]+-[0-9]+_[0-9]+$", "", VLP_contigs_PD_metadata$contig_id)
@@ -115,7 +122,7 @@ VLP_contigs_PD_metadata <- merge(VLP_contigs_PD_metadata, POST_CBR_LENGTH, by='P
 
 # adding cohort name & removing box location (make sure to include it for samples themselves in the sample metadata)
 # this line is very much dependant on the ID structure; make sure to adjust it
-VLP_contigs_PD_metadata$New_CID <- gsub("CHV(\\d{4})\\d*[_A-Z]*\\d*", "NEXT_V\\1", VLP_contigs_PD_metadata$Original_CID)
+VLP_contigs_PD_metadata$New_CID <- paste0("SIV_", VLP_contigs_PD_metadata$Original_CID)
 
 # shorten NODE info
 VLP_contigs_PD_metadata$New_CID <- gsub("ODE_", "", VLP_contigs_PD_metadata$New_CID)
@@ -163,7 +170,7 @@ if (sum(VLP_contigs_PD_metadata$CHV_pruned=="Yes")!=0 | sum(VLP_contigs_PD_metad
 # 1. Get the start coordinates of geNomad and CheckV pruning:
 VLP_contigs_PD_metadata$GND_start <- as.numeric(gsub('-.*', '', VLP_contigs_PD_metadata$GND_coordinates))
 VLP_contigs_PD_metadata$CHV_start <- NA
-VLP_contigs_PD_metadata[VLP_contigs_PD_metadata$CHV_pruned=='Yes',]$CHV_start <- as.numeric(sub(".*_([0-9]+)-[0-9]+.*$", "\\1", VLP_contigs_PD_metadata[VLP_contigs_PD_metadata$CHV_pruned=='Yes',]$POST_CHV_CID))
+VLP_contigs_PD_metadata[VLP_contigs_PD_metadata$CHV_pruned=='Yes',]$CHV_start <- as.numeric(sub(".*_([0-9]+)_[0-9]+-[0-9]+.*$", "\\1", VLP_contigs_PD_metadata[VLP_contigs_PD_metadata$CHV_pruned=='Yes',]$POST_CHV_CID))
 
 # 2. Get the consecutive number of the trimmed sequence:
 
@@ -191,7 +198,7 @@ VLP_contigs_PD_metadata <- VLP_contigs_PD_metadata[,c("New_CID", "provirus", "PO
                                                       "host_genes", "checkv_quality", "miuvig_quality", 
                                                       "completeness", "completeness_method", "contamination", 
                                                       "kmer_freq", "warnings", "taxonomy", "Original_CID", 
-                                                      "Original_length", "CenoteTaker3", "DeepVirFinder", 
+                                                      "Original_length", "DeepVirFinder", 
                                                       "geNomad", "VIBRANT", "VirSorter2", "POST_CBR_CID", 
                                                       "COB_status", "POST_CBR_length", "POST_GND_CID", 
                                                       "GND_pruned", "POST_GND_length", "GND_topology", "GND_coordinates",
